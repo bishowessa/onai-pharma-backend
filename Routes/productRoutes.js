@@ -3,11 +3,14 @@ const router = express.Router();
 const productController = require('../Controllers/productController');
 const userMiddleware = require('../Middlewares/userMiddleware');
 const adminMiddleware = require('../Middlewares/adminMiddleware');
-const upload = require('../Utilities/multerConfig');
+const { upload, resizeImage } = require('../Utilities/multerConfig');
 
 router.route('/')
     .get(productController.getAllProducts)
-    .post(userMiddleware,adminMiddleware, upload.single('image'), productController.createProduct);
+    .post(userMiddleware,adminMiddleware, upload.single('image'), resizeImage , productController.createProduct);
+    
+router.get('/stock', productController.getProductsByStock);
+router.patch('/addStock/:productId', userMiddleware,adminMiddleware, productController.addStock);
 
 router.route('/:id')
     .get(productController.getProduct)

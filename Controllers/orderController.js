@@ -2,23 +2,24 @@ const mongoose = require('mongoose');
 const User = require('../models/userModel');   
 const Order = require('../models/orderModel');
 const Product = require('../models/productModel');
-const responseMsgs = require('../utilities/responseMsgs');
+const responseMsgs = require('../Utilities/responseMsgs');
+
+const nodemailer = require('nodemailer');
+
 
 // Create an order
 const createOrder = async (req, res) => {
     try {
         const { products } = req.body;
 
-        if (!products || products.length === 0) {
+        if (!products || !Array.isArray(products) || products.length === 0) {
             return res.status(400).json({
                 status: responseMsgs.FAIL,
                 message: 'Products array cannot be empty.',
             });
         }
 
-        // Get user ID from token (Assuming user is authenticated)
-        const userId = req.user.id; 
-
+        const userId = req.user.id;
         if (!userId) {
             return res.status(400).json({
                 status: responseMsgs.FAIL,
@@ -28,8 +29,16 @@ const createOrder = async (req, res) => {
 
         let totalPrice = 0;
         const orderItems = [];
+        let orderDetailsText = '';
 
         for (const item of products) {
+            if (!item.product || !item.quantity || item.quantity <= 0 || !Number.isInteger(item.quantity)) {
+                return res.status(400).json({
+                    status: responseMsgs.FAIL,
+                    message: `Invalid product or quantity for item: ${JSON.stringify(item)}`,
+                });
+            }
+
             const product = await Product.findById(item.product);
             if (!product) {
                 return res.status(404).json({
@@ -38,7 +47,6 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Calculate price
             const price = product.price * item.quantity;
             totalPrice += price;
 
@@ -47,15 +55,54 @@ const createOrder = async (req, res) => {
                 quantity: item.quantity,
                 price: product.price,
             });
+
+            // Add product details to the email text
+            orderDetailsText += `${item.quantity} x ${product.name}, `;
         }
 
+        orderDetailsText = orderDetailsText.slice(0, -2); // Remove trailing comma and space
+
         const newOrder = new Order({
-            user: userId, // Add the user ID here
+            user: userId,
             products: orderItems,
             totalPrice,
         });
 
         await newOrder.save();
+
+        // Send email notifications
+        const user = await User.findById(userId);
+
+        // Configure the nodemailer transporter
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: 'bishowessa@gmail.com',
+                pass: 'cqus ttnr yfrh dqhu', // Use an app password if 2FA is enabled
+            },
+        });
+
+        // Send email to the user
+        await transporter.sendMail({
+            from: 'bishowessa@gmail.com',
+            to: user.email,
+            subject: 'Order Confirmation',
+            text: `Thank you for placing your order.
+                   You can track your order in the "My Orders" section.
+                   Here are the details of your order: ${orderDetailsText}.
+                   Your order total is ${totalPrice} EGP.`,
+        });
+
+        // Send email to yourself (bishowessa@gmail.com) for notification
+        await transporter.sendMail({
+            from: 'bishowessa@gmail.com',
+            to: 'maged.m.wessa@gmail.com',
+            subject: 'New Order Placed',
+            text: `A new order has been placed by ${user.name} (${user.email}).
+                   Order details: ${orderDetailsText}.
+                   The address is ${user.address}.
+                   Total order amount: ${totalPrice} EGP`,
+        });
 
         res.status(201).json({
             status: responseMsgs.SUCCESS,
@@ -70,12 +117,14 @@ const createOrder = async (req, res) => {
     }
 };
 
+
 // Get all orders (Admin only)
 const getAllOrders = async (req, res) => {
     try {
         const orders = await Order.find()
-            .populate('user', 'name email') // Populate user details (only name and email)
-            .populate('products.product', 'name price'); // Populate product details (only name and price)
+            .populate('user', 'name email phone address')
+            .populate('products.product', 'name price image');
+
         const totalCost = orders.reduce((sum, order) => sum + order.totalPrice, 0);
 
         res.status(200).json({
@@ -84,7 +133,7 @@ const getAllOrders = async (req, res) => {
             totalCost,
         });
     } catch (error) {
-        console.error('Error retrieving orders:', error);  // Log the error for debugging
+        console.error('Error retrieving orders:', error);
         res.status(500).json({
             status: responseMsgs.FAIL,
             message: 'Error retrieving orders',
@@ -93,12 +142,11 @@ const getAllOrders = async (req, res) => {
 };
 
 
+
 // Get user's orders
 const getUserOrders = async (req, res) => {
     try {
-        // Ensure user ID is correctly retrieved
         const userId = req.user.id;
-
         if (!userId) {
             return res.status(400).json({
                 status: responseMsgs.FAIL,
@@ -106,8 +154,10 @@ const getUserOrders = async (req, res) => {
             });
         }
 
-        // Fetch orders for the logged-in user
-        const orders = await Order.find({ user: userId }).populate('products.product', 'name price image');
+        const orders = await Order.find({ user: userId })
+            .populate('products.product', 'name price image')
+            .populate('user', 'name email phone address');
+
         const totalCost = orders.reduce((sum, order) => sum + order.totalPrice, 0);
         res.status(200).json({
             status: responseMsgs.SUCCESS,
@@ -122,11 +172,12 @@ const getUserOrders = async (req, res) => {
     }
 };
 
-// Update order status (Admin only)
+
+
 const updateOrderStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        const order = await Order.findById(req.params.id);
+        const order = await Order.findById(req.params.id).populate('products.product'); // Ensure products are populated
 
         if (!order) {
             return res.status(404).json({
@@ -135,6 +186,35 @@ const updateOrderStatus = async (req, res) => {
             });
         }
 
+        // Handle stock adjustment only if the status is changing
+        if (order.status !== status) {
+            // Decrease stock when marking as "Completed"
+            if (status === 'Completed') {
+                for (const item of order.products) {
+                    const product = await Product.findById(item.product._id);
+                    if (product.stock >= item.quantity) {
+                        product.stock -= item.quantity;
+                        await product.save();
+                    } else {
+                        return res.status(400).json({
+                            status: responseMsgs.FAIL,
+                            message: `Insufficient stock for product: ${product.name}`,
+                        });
+                    }
+                }
+            }
+
+            // Restore stock when reverting to "Pending"
+            if (order.status === 'Completed' && status === 'Pending') {
+                for (const item of order.products) {
+                    const product = await Product.findById(item.product._id);
+                    product.stock += item.quantity;
+                    await product.save();
+                }
+            }
+        }
+
+        // Update order status
         order.status = status;
         await order.save();
 
@@ -144,12 +224,16 @@ const updateOrderStatus = async (req, res) => {
             data: order,
         });
     } catch (error) {
+        console.error('Error updating order status:', error);
         res.status(500).json({
             status: responseMsgs.FAIL,
             message: 'Error updating order status',
         });
     }
 };
+
+
+
 
 // Delete an order (Admin only)
 const deleteOrder = async (req, res) => {
