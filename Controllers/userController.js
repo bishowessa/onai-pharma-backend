@@ -6,6 +6,101 @@ const jwt = require('jsonwebtoken');
 const responseMsgs = require('../Utilities/responseMsgs');
 
 
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+
+// Temporary in-memory store for reset tokens (use DB in production)
+const resetTokens = new Map(); 
+
+// Send reset link
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await UserModel.findOne({ email });
+        if (!user) {
+            return res.status(404).json({
+                status: responseMsgs.FAIL,
+                data: 'User not found',
+            });
+        }
+
+        // Generate a reset token
+        const token = crypto.randomBytes(32).toString('hex');
+        const resetLink = `http://localhost:4200/reset-password?token=${token}`;
+
+        // Store the token with expiration (1 hour)
+        resetTokens.set(token, { email, expires: Date.now() + 3600000 });
+
+        // Set up email transporter
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: 'bishowessa@gmail.com', // Replace with your email
+                pass: 'cqus ttnr yfrh dqhu',  // Replace with your email password
+            },
+        });
+
+        // Send email
+        await transporter.sendMail({
+            from: 'bishowessa@gmail.com',
+            to: email,
+            subject: 'Password Reset Request',
+            html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 5px; max-width: 500px;">
+                <h2 style="color: #333;">Password Reset Request</h2>
+                <p>Click the button below to reset your password:</p>
+                <a href="${resetLink}" style="background-color: #007bff; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 5px; display: inline-block;">Reset Password</a>
+                <p>If you didn't request this, you can ignore this email.</p>
+            </div>
+        `,
+    });
+
+        res.status(200).json({
+            status: responseMsgs.SUCCESS,
+            message: 'Reset link sent to your email',
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: responseMsgs.FAIL,
+            data: err.message,
+        });
+    }
+};
+
+// Handle password reset
+const resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        const resetData = resetTokens.get(token);
+
+        if (!resetData || resetData.expires < Date.now()) {
+            return res.status(400).json({
+                status: responseMsgs.FAIL,
+                data: 'Invalid or expired token',
+            });
+        }
+
+        // Update user's password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await UserModel.findOneAndUpdate({ email: resetData.email }, { password: hashedPassword });
+
+        // Remove token after successful reset
+        resetTokens.delete(token);
+
+        res.status(200).json({
+            status: responseMsgs.SUCCESS,
+            message: 'Password reset successfully',
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: responseMsgs.FAIL,
+            data: err.message,
+        });
+    }
+};
+
+
+
     
 
 // Register a new user
@@ -272,5 +367,7 @@ module.exports = {
     getUser,
     getCurrentUser,
     updateCurrentUser,
-    logoutUser
+    logoutUser,
+    forgotPassword,
+    resetPassword,
 };

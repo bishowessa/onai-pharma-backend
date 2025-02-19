@@ -32,4 +32,7 @@ router.route('/updateCurrentUser')
 router.route('/logout')
     .post(userController.logoutUser);
 
+router.post('/forgotPassword', userController.forgotPassword);
+router.post('/reset-password', userController.resetPassword);
+
 module.exports = router;
