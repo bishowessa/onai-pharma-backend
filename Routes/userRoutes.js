@@ -11,8 +11,12 @@ router.route('/')
 router.route('/getCurrentUser')
     .get(userMiddleware, userController.getCurrentUser);
 
+router.get('/singleUser/:id', userMiddleware, adminMiddleware, userController.getSingleUser);
+
 router.route('/:email')
     .get(userMiddleware, adminMiddleware, userController.getUser);
+
+router.get('/checkEmail/:email', userController.checkEmail);
 
 router.route('/register')
     .post(userValidations, userController.registerUser);
@@ -34,5 +38,9 @@ router.route('/logout')
 
 router.post('/forgotPassword', userController.forgotPassword);
 router.post('/reset-password', userController.resetPassword);
+router.post('/get-token-email', userController.getTokenEmail);
+
+router.patch('/promote/:id', userMiddleware, adminMiddleware, userController.promoteToAdmin);
+
 
 module.exports = router;

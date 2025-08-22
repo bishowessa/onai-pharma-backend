@@ -67,38 +67,65 @@ const forgotPassword = async (req, res) => {
     }
 };
 
-// Handle password reset
+
+
 const resetPassword = async (req, res) => {
     try {
         const { token, newPassword } = req.body;
-        const resetData = resetTokens.get(token);
+        const tokenData = resetTokens.get(token);
 
-        if (!resetData || resetData.expires < Date.now()) {
+        if (!tokenData || tokenData.expires < Date.now()) {
             return res.status(400).json({
-                status: responseMsgs.FAIL,
+                status: 'fail',
                 data: 'Invalid or expired token',
             });
         }
 
-        // Update user's password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await UserModel.findOneAndUpdate({ email: resetData.email }, { password: hashedPassword });
+        const user = await UserModel.findOne({ email: tokenData.email });
+        if (!user) {
+            return res.status(404).json({
+                status: 'fail',
+                data: 'User not found',
+            });
+        }
 
-        // Remove token after successful reset
-        resetTokens.delete(token);
+        // **Hash the new password before saving**
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+
+        await user.save();
+        resetTokens.delete(token); // Delete the token after successful reset
 
         res.status(200).json({
-            status: responseMsgs.SUCCESS,
+            status: 'success',
             message: 'Password reset successfully',
         });
     } catch (err) {
         res.status(500).json({
-            status: responseMsgs.FAIL,
+            status: 'fail',
             data: err.message,
         });
     }
 };
 
+
+const getTokenEmail = (req, res) => {
+    const { token } = req.body;
+    const tokenData = resetTokens.get(token);
+  
+    if (!tokenData || tokenData.expires < Date.now()) {
+      return res.status(400).json({
+        status: 'fail',
+        data: 'Invalid or expired token',
+      });
+    }
+  
+    res.status(200).json({
+      status: 'success',
+      email: tokenData.email,
+    });
+  };
+  
 
 
     
@@ -155,23 +182,27 @@ const loginUser = async (req, res) => {
 
         const token = jwt.sign({ id: loginUser._id, role: loginUser.role }, process.env.JWTKEY, { expiresIn: '1h' });
         
-        // Set the cookie here first
+        // Set the cookie
         res.cookie('jwt', token, {
-            httpOnly: true,          // Prevent frontend JS access
-            secure: false,           // Set to true in production (for HTTPS)
-            sameSite: 'Lax',         // Allows frontend to send cookies
-            path: '/',               // Ensure accessibility across all pages
-            maxAge: 60 * 60 * 1000,  // Expiration time (1 hour)
-            domain: 'localhost',     // Make sure to match your domain here
+            httpOnly: false,
+            secure: false, // Change to `true` in production
+            sameSite: 'Lax',
+            path: '/',
+            maxAge: 60 * 60 * 1000, // 1 hour
+            domain: 'localhost',
         });
-        // this.cookieService.set('jwt', response.token, { path: '/', expires: '1h', sameSite: 'Lax' });
 
-
-        // Now send the response with the token as JSON
+        // Send response with token and user details
         res.json({
             status: responseMsgs.SUCCESS,
             message: 'Login successful',
-            token,  // You can return the token in the response body if necessary
+            token,
+            user: {
+                id: loginUser._id,
+                name: loginUser.name,
+                email: loginUser.email,
+                role: loginUser.role,
+            }
         });
 
     } catch (err) {
@@ -200,6 +231,45 @@ const getCurrentUser = async (req, res) => {
     }
 };
 
+
+const getSingleUser= async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await UserModel.findById(id);
+        if (!user) {
+            return res.status(404).json({
+                status: responseMsgs.FAIL,
+                data: 'User not found',
+            });
+        }
+        res.status(200).json({
+            status: responseMsgs.SUCCESS,
+            data: user,
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: responseMsgs.FAIL,
+            data: err.message,
+        });
+    }
+};
+
+const checkEmail = async (req, res) => {
+    const email = req.params.email;
+    try {
+      const user = await UserModel.findOne({ email });
+      
+      if (!user) {
+        return res.status(404).json({ exists: false });
+      }
+  
+      return res.status(200).json({ exists: true, user });
+    } catch (error) {
+      console.error('Error checking email existence:', error);
+      res.status(500).json({ error: 'Failed to check email.' });
+    }
+  };
+  
 // Get all users (Admin only)
 const getAllUsers = async (req, res) => {
     try {
@@ -256,12 +326,12 @@ const updateCurrentUser = async (req, res) => {
         const updatedData = req.body;
 
         // Prevent role updates by normal users
-        if (updatedData.role) {
-            return res.status(403).json({
-                status: responseMsgs.FAIL,
-                data: 'Unauthorized to update role',
-            });
-        }
+        // if (updatedData.role) {
+        //     return res.status(403).json({
+        //         status: responseMsgs.FAIL,
+        //         data: 'Unauthorized to update role',
+        //     });
+        // }
 
         // Hash password if updated
         if (updatedData.password) {
@@ -358,6 +428,27 @@ const deleteUser = async (req, res) => {
     }
 };
 
+const promoteToAdmin = async (req, res) => {
+    console.log('promoteToAdmin');
+    try {
+        const userId = req.params.id;
+        const user = await UserModel.findById(userId);
+
+        if (!user) {
+          return res.status(404).json({ status: 'fail', message: 'User not found' });
+        }
+    
+        user.role = 'admin';
+        await user.save();
+    
+        res.status(200).json({ status: 'success', message: 'User promoted to admin' });
+      } catch (err) {
+        res.status(500).json({ status: 'fail', message: err.message });
+      }
+    }
+
+
+    
 module.exports = {
     registerUser,
     loginUser,
@@ -370,4 +461,8 @@ module.exports = {
     logoutUser,
     forgotPassword,
     resetPassword,
+    getTokenEmail,
+    promoteToAdmin,
+    getSingleUser,
+    checkEmail
 };
