@@ -184,12 +184,10 @@ const loginUser = async (req, res) => {
         
         // Set the cookie
         res.cookie('jwt', token, {
-            httpOnly: false,
-            secure: false, // Change to `true` in production
-            sameSite: 'Lax',
-            path: '/',
+            httpOnly: true,
+            secure: true, // IMPORTANT: The cookie will only be sent over HTTPS
+            sameSite: 'None', // Adjust based on your client-server setup   
             maxAge: 60 * 60 * 1000, // 1 hour
-            domain: 'localhost',
         });
 
         // Send response with token and user details
