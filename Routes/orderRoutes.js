@@ -2,7 +2,7 @@ const express = require('express');
 const { createOrder, getAllOrders, getUserOrders, updateOrderStatus, deleteOrder, editUserOrder, deleteUserOrder } = require('../Controllers/orderController');
 const userMiddleware = require('../Middlewares/userMiddleware');
 const adminMiddleware = require('../Middlewares/adminMiddleware');
-const { validateOrder, checkValidationResult } = require('../validations/orderValidations');
+const { validateOrder, checkValidationResult } = require('../Validations/orderValidations');
 
 
 const router = express.Router();
