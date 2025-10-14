@@ -10,27 +10,45 @@ const path = require('path');
 
 const app = express();
 
+// --- CHANGE 1: UPDATED CORS CONFIGURATION FOR DEPLOYMENT ---
+const allowedOrigins = [
+  'https://onaipharma.me',
+  'https://www.onaipharma.me'
+];
+
+const corsOptions = {
+  // If you are using cookies/credentials, you must specify an origin.
+  // A wildcard '*' is not allowed when credentials are true.
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+app.use(cors(corsOptions));
+// -----------------------------------------------------------
+
 // Middleware
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.json());
-app.use(cors({
-    origin: 'http://localhost:4200',
-    credentials: true
-}))
-
 app.use(cookieParser());
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
 }).then(() => console.log('MongoDB Connected'))
-    .catch(err => console.log(err));
+  .catch(err => console.log(err));
 
-const PORT = process.env.PORT || 5000;
+// --- CHANGE 2: ADDED A FALLBACK PORT FOR LOCAL DEVELOPMENT ---
+const PORT = process.env.PORT || 3000;
+// -----------------------------------------------------------
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 app.use('/uploads', express.static('uploads')); // Serve static images
 app.use('/products', productRoutes);
 app.use('/users', userRoutes);
 app.use('/orders', orderRoutes);
-
-
