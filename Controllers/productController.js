@@ -1,4 +1,4 @@
-const ProductModel = require('../models/ProductModel');
+const ProductModel = require('../models/productModel');
 const responseMsgs = require('../Utilities/responseMsgs');
 
 // Base URL for the server
