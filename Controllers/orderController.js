@@ -294,18 +294,18 @@ const editUserOrder = async (req, res) => {
         }
 
         // Debugging: Check products and order products
-        console.log('Products from request body:', products);
-        console.log('Order products from DB:', order.products);
+        
+        
 
         // Update the products and quantities without touching the price
         order.products = order.products.map((orderProduct) => {
             // Debugging: log each orderProduct and updated product
-            console.log('Order product:', orderProduct);
-            console.log('Updated product:', products.find((item) => item.product.toString() === orderProduct.product.toString()));
+            
+            
 
             const updatedProduct = products.find((item) => {
                 // Convert both product ids to strings for comparison
-                console.log('Comparing:', orderProduct.product.toString(), item.product.toString());
+                
                 return item.product.toString() === orderProduct.product.toString();
             });
 
@@ -313,7 +313,7 @@ const editUserOrder = async (req, res) => {
                 // Keep the price as is and update the quantity
                 orderProduct.quantity = updatedProduct.quantity;
             } else {
-                console.log('No match found for orderProduct:', orderProduct.product);
+                
             }
 
             return orderProduct;

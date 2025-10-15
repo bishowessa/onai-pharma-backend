@@ -145,7 +145,7 @@ const registerUser = async (req, res) => {
         newUser.password = await bcrypt.hash(newUser.password, 10);
 
         await UserModel.create(newUser);
-        console.log('User created successfully');
+        
         res.status(201).json({
             status: responseMsgs.SUCCESS,
             message: 'User created successfully',
@@ -426,7 +426,7 @@ const deleteUser = async (req, res) => {
 };
 
 const promoteToAdmin = async (req, res) => {
-    console.log('promoteToAdmin');
+    
     try {
         const userId = req.params.id;
         const user = await UserModel.findById(userId);

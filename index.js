@@ -41,15 +41,16 @@ app.use(cookieParser());
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
-}).then(() => console.log('MongoDB Connected'))
-  .catch(err => console.log(err));
+}).catch(err => {
+  console.error('Failed to connect to MongoDB', err);
+  process.exit(1); 
+});
 
 // --- CHANGE 2: ADDED A FALLBACK PORT FOR LOCAL DEVELOPMENT ---
 const PORT = process.env.PORT || 3000;
 // -----------------------------------------------------------
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
+app.listen(PORT);
 app.use('/uploads', express.static('uploads')); // Serve static images
 app.use('/products', productRoutes);
 app.use('/users', userRoutes);
