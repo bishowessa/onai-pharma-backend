@@ -26,8 +26,7 @@ const forgotPassword = async (req, res) => {
 
         // Generate a reset token
         const token = crypto.randomBytes(32).toString('hex');
-        const resetLink = `http://localhost:4200/reset-password?token=${token}`;
-
+        const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
         // Store the token with expiration (1 hour)
         resetTokens.set(token, { email, expires: Date.now() + 3600000 });
 

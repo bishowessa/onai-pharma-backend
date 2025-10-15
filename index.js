@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
+const helmet = require('helmet');
 const cors = require('cors');
 const productRoutes = require('./Routes/productRoutes');
 const userRoutes = require('./Routes/userRoutes');
@@ -9,11 +10,12 @@ const orderRoutes = require('./Routes/orderRoutes');
 const path = require('path');
 
 const app = express();
-
+app.use(helmet());
 // --- CHANGE 1: UPDATED CORS CONFIGURATION FOR DEPLOYMENT ---
 const allowedOrigins = [
   'https://onaipharma.me',
-  'https://www.onaipharma.me'
+  'https://www.onaipharma.me',
+  'http://localhost:4200'
 ];
 
 const corsOptions = {
@@ -52,3 +54,7 @@ app.use('/uploads', express.static('uploads')); // Serve static images
 app.use('/products', productRoutes);
 app.use('/users', userRoutes);
 app.use('/orders', orderRoutes);
+app.use((err, req, res, next) => {
+  console.error(err.stack); // Log the error for debugging
+  res.status(500).send('Something broke!');
+});

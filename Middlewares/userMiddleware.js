@@ -26,13 +26,13 @@ const userMiddleware = (req, res, next) => {
             );
 
             res.cookie('jwt', newToken, {
-                httpOnly: false,
-                secure: false,
-                sameSite: 'Lax',
-                path: '/',
-                maxAge: 60 * 60 * 1000, // 1 hour
-                domain: 'localhost',
-            });
+            httpOnly: true, // Recommended for security
+            secure: true,   // MUST be true for cross-site cookies
+            sameSite: 'None', // MUST be 'None' for cross-site cookies
+            path: '/',
+            maxAge: 60 * 60 * 1000, // 1 hour
+            domain: process.env.COOKIE_DOMAIN, // Set to your frontend's root domain
+}); 
         }
 
         next();

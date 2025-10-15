@@ -1,8 +1,9 @@
 const ProductModel = require('../models/productModel');
 const responseMsgs = require('../Utilities/responseMsgs');
 
+
 // Base URL for the server
-const baseUrl = 'http://localhost:5000';
+const baseUrl = process.env.BACKEND_URL;
 
 // Create a new product (Admin only)
 const createProduct = async (req, res) => {
